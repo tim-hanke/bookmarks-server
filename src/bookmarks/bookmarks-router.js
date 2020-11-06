@@ -49,7 +49,31 @@ bookmarkRouter
 
 bookmarkRouter
   .route("/bookmarks/:id")
-  .get((req, res) => {})
-  .delete((req, res) => {});
+  .get((req, res) => {
+    const { id } = req.params;
+    const bookmark = bookmarks.find((b) => b.id == id);
+
+    if (!bookmark) {
+      logger.error(`Bookmark with id ${id} not found`);
+      return res.status(404).send("Bookmark not found");
+    }
+
+    res.json(bookmark);
+  })
+  .delete((req, res) => {
+    const { id } = req.params;
+    const bookmarkIndex = bookmarks.findIndex((b) => b.id == id);
+
+    if (bookmarkIndex === -1) {
+      logger.error(`Bookmark with id ${id} not found`);
+      return res.status(404).send("Bookmark not found");
+    }
+
+    bookmarks.splice(bookmarkIndex, 1);
+
+    logger.info(`Bookmark with id ${id} deleted`);
+
+    res.status(204).end();
+  });
 
 module.exports = bookmarkRouter;
