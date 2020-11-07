@@ -1,5 +1,6 @@
 const express = require("express");
 const { v4: uuid } = require("uuid");
+const { isWebUri } = require("valid-url");
 const logger = require("../logger");
 
 const bookmarks = [];
@@ -13,19 +14,23 @@ bookmarksRouter
     res.json(bookmarks);
   })
   .post(bodyParser, (req, res) => {
+    for (const field of ["title", "url"]) {
+      if (!req.body[field]) {
+        logger.error(`${field} is required`);
+        return res.status(400).send(`${field} is required`);
+      }
+    }
+
     const { title, url, description, rating = 1 } = req.body;
 
-    if (!title) {
-      logger.error("Title is required");
-      return res.status(400).send("Invalid data");
+    if (!isWebUri(url)) {
+      logger.error(`Invalid URL given: ${url}`);
+      return res.status(400).send("invalid URL supplied");
     }
-    if (!url) {
-      logger.error("URL is required");
-      return res.status(400).send("Invalid data");
-    }
-    if (!description) {
-      logger.error("Description is required");
-      return res.status(400).send("Invalid data");
+
+    if (!Number.isInteger(rating) || rating < 0 || rating > 5) {
+      logger.error(`Invalid rating of '${rating}' supplied`);
+      return res.status(400).send("Rating must be a number between 0 and 5");
     }
 
     const id = uuid();
