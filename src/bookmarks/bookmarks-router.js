@@ -4,10 +4,10 @@ const logger = require("../logger");
 
 const bookmarks = [];
 
-const bookmarkRouter = express.Router();
+const bookmarksRouter = express.Router();
 const bodyParser = express.json();
 
-bookmarkRouter
+bookmarksRouter
   .route("/bookmarks")
   .get((req, res) => {
     res.json(bookmarks);
@@ -47,7 +47,7 @@ bookmarkRouter
       .json(bookmark);
   });
 
-bookmarkRouter
+bookmarksRouter
   .route("/bookmarks/:id")
   .get((req, res) => {
     const { id } = req.params;
@@ -76,4 +76,4 @@ bookmarkRouter
     res.status(204).end();
   });
 
-module.exports = bookmarkRouter;
+module.exports = bookmarksRouter;
