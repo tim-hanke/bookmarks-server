@@ -1,3 +1,4 @@
+const path = require("path");
 const express = require("express");
 const { isWebUri } = require("valid-url");
 const xss = require("xss");
@@ -15,10 +16,6 @@ const sanitizeBookmark = (bookmark) => ({
 
 bookmarksRouter
   .route("/")
-  .get((req, res, next) => res.status(200).send("Hello, world!"));
-
-bookmarksRouter
-  .route("/bookmarks")
   .get((req, res, next) => {
     const knexInstance = req.app.get("db");
     BookmarksService.getAllBookmarks(knexInstance)
@@ -37,9 +34,7 @@ bookmarksRouter
       }
     }
 
-    const { title, url, description, rating = 1 } = req.body;
-
-    console.log(url);
+    const { title, url, description, rating } = req.body;
 
     if (!isWebUri(url)) {
       logger.error(`Invalid URL given: ${url}`);
@@ -47,6 +42,7 @@ bookmarksRouter
         error: { message: "'url' must be a valid URL" },
       });
     }
+
     const ratingNum = Number(rating);
 
     if (!Number.isInteger(ratingNum) || ratingNum < 0 || ratingNum > 5) {
@@ -66,13 +62,16 @@ bookmarksRouter
     BookmarksService.addBookmark(req.app.get("db"), sanitizeBookmark(bookmark))
       .then((bookmark) => {
         logger.info(`Bookmark with id ${bookmark.id} created`);
-        res.status(201).location(`/bookmarks/${bookmark.id}`).json(bookmark);
+        res
+          .status(201)
+          .location(path.posix.join(req.originalUrl, `/${bookmark.id}`))
+          .json(bookmark);
       })
       .catch(next);
   });
 
 bookmarksRouter
-  .route("/bookmarks/:id")
+  .route("/:id")
   .all((req, res, next) => {
     BookmarksService.getById(req.app.get("db"), req.params.id)
       .then((bookmark) => {
