@@ -4,6 +4,7 @@ const { isWebUri } = require("valid-url");
 const xss = require("xss");
 const logger = require("../logger");
 const BookmarksService = require("./bookmarks-service");
+const bookmarkValidator = require("./bookmarks-validator");
 
 const bookmarksRouter = express.Router();
 const bodyParser = express.json();
@@ -36,28 +37,16 @@ bookmarksRouter
 
     const { title, url, description, rating } = req.body;
 
-    if (!isWebUri(url)) {
-      logger.error(`Invalid URL given: ${url}`);
-      return res.status(400).json({
-        error: { message: "'url' must be a valid URL" },
-      });
-    }
-
-    const ratingNum = Number(rating);
-
-    if (!Number.isInteger(ratingNum) || ratingNum < 0 || ratingNum > 5) {
-      logger.error(`Invalid rating of '${rating}' supplied`);
-      return res.status(400).json({
-        error: { message: "'rating' must be a number between 0 and 5" },
-      });
-    }
-
     const bookmark = {
       title,
       url,
       description,
       rating,
     };
+
+    const error = bookmarkValidator(bookmark);
+
+    if (error) return res.status(400).json(error);
 
     BookmarksService.addBookmark(req.app.get("db"), sanitizeBookmark(bookmark))
       .then((bookmark) => {
@@ -68,6 +57,19 @@ bookmarksRouter
           .json(bookmark);
       })
       .catch(next);
+  })
+  .patch((req, res, next) => {
+    // I put this under '/api/bookmarks' route so that a helpful error
+    // message can be dispayed if a PATCH attempt is made without
+    // providing a bookmark id as URL param
+    // I'm not sure if this 'semantically' correct
+    if (!req.params.id) {
+      return res.status(404).json({
+        error: {
+          message: `bookmark id must be supplied '/api/bookmarks/{id}'`,
+        },
+      });
+    }
   });
 
 bookmarksRouter
@@ -90,6 +92,51 @@ bookmarksRouter
   })
   .delete((req, res, next) => {
     BookmarksService.deleteBookmark(req.app.get("db"), req.params.id)
+      .then(() => {
+        res.status(204).end();
+      })
+      .catch(next);
+  })
+  .patch(bodyParser, (req, res, next) => {
+    const { title, url, description, rating } = req.body;
+
+    if (!req.params.id) {
+      return res.status(400).json({
+        error: {
+          message: `bookmark id must be supplied '/api/bookmarks/{id}'`,
+        },
+      });
+    }
+
+    // in creating this object, I'm also attempting to sanitize the
+    // inputs against cross site scripting attempts
+    const bookmarkToUpdate = {
+      title: title ? xss(title) : title,
+      url,
+      description: description ? xss(description) : description,
+      rating,
+    };
+
+    const numberOfValues = Object.values(bookmarkToUpdate).filter(Boolean)
+      .length;
+    if (numberOfValues === 0) {
+      return res.status(400).json({
+        error: {
+          message:
+            "Request body must contain either 'title', 'url', 'description' or 'rating'",
+        },
+      });
+    }
+
+    const error = bookmarkValidator(bookmarkToUpdate);
+
+    if (error) return res.status(400).json(error);
+
+    BookmarksService.updateBookmark(
+      req.app.get("db"),
+      req.params.id,
+      bookmarkToUpdate
+    )
       .then(() => {
         res.status(204).end();
       })
